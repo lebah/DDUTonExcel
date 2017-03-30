@@ -1,6 +1,7 @@
 ﻿using System;
+using System.Data;
+using System.Data.OleDb;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Excel = Microsoft.Office.Interop.Excel;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -8,11 +9,16 @@ using System.Linq;
 namespace DDUTonExcel
 {
     [TestClass]
-    public class UnitTest1
+    public class UnitTest3
     {
         const string WORKBOOK_NAME = @"D:\GitHub\DDUTonExcel\DDUTonExcel\Sample.xlsx";
         const string SHEET_NAME = "SampleSheet";
         private TestContext testContextInstance;
+        private string connectionString;
+        private string fileName;
+        private string sheetName;
+        List<string> listColumn = new List<string>();
+
 
         public TestContext TestContext
         {
@@ -20,9 +26,10 @@ namespace DDUTonExcel
             set { testContextInstance = value; }
         }
 
-        public UnitTest1()
+        public UnitTest3()
         {
-
+            connectionString = @"Provider=Microsoft.ACE.OLEDB.12.0;Data Source=D:\GitHub\DDUTonExcel\DDUTonExcel\Sample.xlsx;Extended Properties=""Excel 12.0 Xml;HDR=YES"";";
+            sheetName = SHEET_NAME;
         }
 
         [DataSource(@"Provider=Microsoft.ACE.OLEDB.12.0;Data Source=D:\GitHub\DDUTonExcel\DDUTonExcel\Sample.xlsx;Extended Properties=""Excel 12.0 Xml;HDR=YES"";",
@@ -30,31 +37,33 @@ namespace DDUTonExcel
         [TestMethod()]
         public void CheckColumnsHeader()
         {
-            
+
             Assert.AreEqual(1, 1);
         }
 
         [TestMethod()]
-        public void CheckColumnsHeader2()
+        public void CheckColumnsHeader3()
         {
-            OpenExcel(WORKBOOK_NAME, SHEET_NAME);
+            var dt = GetWorksheet(sheetName);
+            Assert.AreEqual("Id", listColumn[0]);
         }
 
-        public System.Data.DataTable GetWorksheet(string worksheetName)
+        public DataTable GetWorksheet(string worksheetName)
         {
-            OleDbConnection con = new System.Data.OleDb.OleDbConnection(connectionString);
-            OleDbDataAdapter cmd = new System.Data.OleDb.OleDbDataAdapter(
+            OleDbConnection con = new OleDbConnection(connectionString);
+            OleDbDataAdapter cmd = new OleDbDataAdapter(
                 "select * from [" + worksheetName + "$]", con);
 
             con.Open();
-            System.Data.DataSet excelDataSet = new DataSet();
+            var excelDataSet = new DataSet();
             cmd.Fill(excelDataSet);
-            con.Close();
+            //con.Close();
 
-            DataTable dt = conn.GetOleDbSchemaTable(OleDbSchemaGuid.Columns, new object[] { null, null, sheetName, null });
+            DataTable dt = con.GetOleDbSchemaTable(OleDbSchemaGuid.Columns, new object[] { null, null, sheetName + "$", null });
 
-            List<string> listColumn = new List<string>();
+            listColumn = new List<string>();
             foreach (DataRow row in dt.Rows)
+            
             {
                 listColumn.Add(row["Column_name"].ToString());
             }
@@ -83,7 +92,7 @@ namespace DDUTonExcel
             System.Data.DataTable dataSet = con.GetOleDbSchemaTable(OleDbSchemaGuid.Tables, null);
 
             //get the number of sheets in the file
-            workSheetNames = new String[dataSet.Rows.Count];
+            var workSheetNames = new String[dataSet.Rows.Count];
             int i = 0;
             foreach (DataRow row in dataSet.Rows)
             {
@@ -103,71 +112,11 @@ namespace DDUTonExcel
                 dataSet.Dispose();
         }
 
-        private void OpenExcel(string workBookName, string sheetName)
-        {
-            Excel.Application excelapplication = null;
-            Excel.Workbook workbook = null;
-
-            try
-            {
-                excelapplication = new Excel.Application();
-                workbook = excelapplication.Workbooks.Open(workBookName);
-                var errors = new Dictionary<string, List<string>>();
-                
-                var sheet = workbook.Sheets[sheetName];
-
-                int rowCount = sheet.UsedRange.Cells.Rows.Count;
-                int colCount = sheet.UsedRange.Cells.Columns.Count;
-                var usedCells = sheet.UsedRange.Cells;
-
-                for (int i = 1; i <= rowCount; i++)
-                {
-                    for (int j = 1; j <= colCount; j++)
-                    {
-                        Excel.Range range = usedCells[i, j];
-                        List<string> cellErrors = new List<string>();
-                        if (!IsHeaderCell(workbook, range))
-                        {
-                            string cellDisplayTitle = String.Format("{0}!{1}", sheet.Name, range.Address);
-                            errors[cellDisplayTitle] = cellErrors;
-                        }
-
-                    }
-                }
-                //ReportErrors(errors);
-            }
-            finally
-            {
-                if (workbook != null)
-                    workbook.Close();
-                if (excelapplication != null)
-                    excelapplication.Quit();
-            }
-        }
-
-        private bool IsHeaderCell(Excel.Workbook workbook, Excel.Range range)
-        {
-            // Look through workbook names:
-            foreach (Excel.Name namedRange in workbook.Names)
-            {
-                if (range.Parent == namedRange.RefersToRange.Parent && range.Application.Intersect(range, namedRange.RefersToRange) != null)
-                    return true;
-            }
-
-            // Look through worksheet-names.
-            foreach (Excel.Name namedRange in range.Worksheet.Names)
-            {
-                if (range.Parent == namedRange.RefersToRange.Parent && range.Worksheet.Application.Intersect(range, namedRange.RefersToRange) != null)
-                    return true;
-            }
-            return false;
-        }
-
         private string ReportErrors(Dictionary<string, List<string>> errors)
         {
             var result = string.Empty;
             if (errors.Count > 0)
-            {                
+            {
                 result += "Found the following errors:";
                 result += "---------------------------------";
                 result += string.Format("{0,-15} | Error", "Cell");
